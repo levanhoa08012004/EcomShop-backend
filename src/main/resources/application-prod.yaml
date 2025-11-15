@@ -8,7 +8,7 @@ jwt:
 
 spring:
   datasource:
-    url: ${DBMS_URL}
+    url: jdbc:mysql://16.19.0.128:3306/webmuasam
     username: ${DBMS_USERNAME}
     password: ${DBMS_PASSWORD}
     driver-class-name: com.mysql.cj.jdbc.Driver

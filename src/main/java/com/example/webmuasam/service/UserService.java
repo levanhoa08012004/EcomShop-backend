@@ -45,12 +45,17 @@ public class UserService {
         this.orderDetailRepository = orderDetailRepository;
     }
 
+    @Transactional
     public CreateUserResponse CreateUser(User user) throws AppException {
 
         User savedUser;
-        if (this.userRepository.existsByEmail(user.getEmail())) {
-            throw new AppException("Email đã tồn tại");
-        } else {
+        try {
+            if (userRepository.existsByEmail(user.getEmail())) {
+                throw new AppException("Email đã được sử dụng");
+            }
+            if (userRepository.existsByUsername(user.getUsername())) {
+                throw new AppException("Tên người dùng đã tồn tại");
+            }
             if (user.getRole() != null && user.getRole().getId() != null) {
                 Role role = this.roleRepository.findById(user.getRole().getId()).get();
                 user.setRole(role != null ? role : null);
@@ -59,13 +64,13 @@ public class UserService {
             user.setPassword(passwordEncoder.encode(user.getPassword()));
 
             savedUser = userRepository.save(user);
-            try {
-                this.cartService.createCart(savedUser.getId());
-            } catch (Exception e) {
-                throw new RuntimeException(e);
-            }
+            this.cartService.createCart(savedUser.getId());
+            return convertToCreateUserResponse(savedUser);
+
+        } catch (Exception e) {
+                throw new AppException("Tên người dùng hoặc email đã tồn tại");
         }
-        return convertToCreateUserResponse(savedUser);
+
 
     }
     public CreateUserResponse convertToCreateUserResponse(User user){

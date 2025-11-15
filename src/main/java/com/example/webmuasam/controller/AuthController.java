@@ -61,8 +61,6 @@ public class AuthController {
 
 
         SecurityContextHolder.getContext().setAuthentication(authentication);
-        LoginResponse responseLogin = new LoginResponse();
-
         LoginResponse res = new LoginResponse();
         User currentUserDB = null;
         try {

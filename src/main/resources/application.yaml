@@ -10,10 +10,15 @@ spring:
     hibernate:
       ddl-auto: update
     show-sql: true
+  cache:
+    type: redis
   data:
     web:
       pageable:
         one-indexed-parameters: true
+    redis:
+      host: 16.19.0.128    # nếu Redis chạy trong Docker cùng máy
+      port: 6379
   mail:
     host: smtp.gmail.com
     port: 587

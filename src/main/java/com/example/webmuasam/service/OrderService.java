@@ -14,23 +14,18 @@ import com.example.webmuasam.repository.*;
 import com.example.webmuasam.util.SecurityUtil;
 import com.example.webmuasam.util.constant.PaymentMethod;
 import com.example.webmuasam.util.constant.StatusOrder;
+import jakarta.annotation.PostConstruct;
 import lombok.Builder;
 import lombok.extern.slf4j.Slf4j;
-import org.hibernate.metamodel.mapping.ordering.ast.OrderingSpecification;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.Instant;
-import java.time.LocalDate;
-import java.time.YearMonth;
-import java.time.ZoneId;
-import java.util.ArrayList;
-import java.util.Base64;
-import java.util.Comparator;
-import java.util.List;
+import java.time.*;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -46,7 +41,10 @@ public class OrderService {
     private final CartService cartService;
     private final VoucherRepository voucherRepository;
     private final VoucherService voucherService;
-    public OrderService (OrderRepository orderRepository,ProductVariantRepository productVariantRepository,OrderDetailRepository orderDetailRepository,CartRepository cartRepository,CartItemRepository cartItemRepository,UserRepository userRepository,CartService cartService,VoucherRepository voucherRepository,VoucherService voucherService) {
+    private final RedisTemplate<String, Object> redisTemplate;
+
+
+    public OrderService (OrderRepository orderRepository,ProductVariantRepository productVariantRepository,OrderDetailRepository orderDetailRepository,CartRepository cartRepository,CartItemRepository cartItemRepository,UserRepository userRepository,CartService cartService,VoucherRepository voucherRepository,VoucherService voucherService,RedisTemplate<String, Object> redisTemplate) {
         this.orderRepository = orderRepository;
         this.productVariantRepository = productVariantRepository;
         this.orderDetailRepository = orderDetailRepository;
@@ -56,7 +54,38 @@ public class OrderService {
         this.cartService = cartService;
         this.voucherRepository = voucherRepository;
         this.voucherService = voucherService;
+        this.redisTemplate = redisTemplate;
     }
+
+    @PostConstruct
+    public void initStockToRedis() {
+        List<ProductVariant> productVariants = productVariantRepository.findAll();
+
+        for (ProductVariant productVariant : productVariants) {
+            String key = "stock:" + productVariant.getId();
+
+            // Xoá key cũ nếu tồn tại hoặc kiểm tra kiểu dữ liệu
+            Object value = redisTemplate.opsForValue().get(key);
+            boolean needSet = false;
+
+            if (value == null) {
+                needSet = true; // key chưa tồn tại
+            } else {
+                try {
+                    // Kiểm tra xem giá trị có parse được thành long không
+                    Long.parseLong(value.toString());
+                } catch (NumberFormatException e) {
+                    needSet = true; // giá trị hiện tại không phải số -> cần set lại
+                }
+            }
+
+            if (needSet) {
+                redisTemplate.opsForValue().set(key, (long) productVariant.getStockQuantity());
+            }
+        }
+    }
+
+
     @Transactional
     public OrderResponseDetail createOrderByCash(OrderRequestByCash orderRequest) throws AppException {
         String email = SecurityUtil.getCurrentUserLogin()
@@ -65,96 +94,111 @@ public class OrderService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new AppException("Email không tồn tại"));
 
-        Cart cart = cartRepository.findByUser(user)
+        Cart cart = cartRepository.findByUserIdForUpdate(user.getId())
                 .orElseThrow(() -> new AppException("Không tìm thấy giỏ hàng"));
 
-        // Copy list cartItem tránh lỗi khi xóa sau đó dùng lại
         List<CartItemDTO> items = cart.getCartItems().stream().map(ci -> new CartItemDTO(ci.getProductVariant().getId(),ci.getQuantity())).collect(Collectors.toList());
         if (items.isEmpty()) {
             throw new AppException("Giỏ hàng đang trống");
         }
+        List<Long> variants = items.stream().map(CartItemDTO::getVariantId).distinct().toList();
+        Map<Long,ProductVariant> variantMap = this.productVariantRepository.findAllById(variants).stream().collect(Collectors.toMap(ProductVariant::getId,v->v));
 
-        // Lấy danh sách variant để kiểm kho
-        List<Long> variantIds = items.stream()
-                .map(CartItemDTO::getVariantId)
-                .distinct()
-                .collect(Collectors.toList());
 
-        List<ProductVariant> variants = productVariantRepository.findAllByIdInForUpdate(variantIds);
-
-        // Kiểm tra tồn kho từng sản phẩm
-        for (CartItemDTO item : items) {
-            ProductVariant variant = findVariant(variants, item.getVariantId());
-            if (variant.getStockQuantity() < item.getQuantity()) {
-                throw new AppException("Sản phẩm " + variant.getProduct().getName() + " không đủ hàng");
-            }
-        }
-        double total = items.stream()
-                .mapToDouble(item -> {
-                    try {
-                        ProductVariant productVariant = this.productVariantRepository.findById(item.getVariantId()).orElseThrow(()-> new AppException("productVariant khong ton tai"));
-                        return productVariant.getProduct().getPrice() * item.getQuantity();
-                    } catch (AppException e) {
-                        throw new RuntimeException(e);
-                    }
-                })
-                .sum();
-
-        // Tạo đơn hàng
-        Order order = new Order();
-        if(orderRequest.getVoucherCode()!=null && !orderRequest.getVoucherCode().isEmpty()){
-            Voucher voucher = this.voucherService.applyVoucher(orderRequest.getVoucherCode(),total);
-            if(voucher!=null){
-                voucher.setUsedCount(voucher.getUsedCount()+1);
-                this.voucherRepository.save(voucher);
-                if(voucher.getDiscountAmount()>0){
-                    total-=voucher.getDiscountAmount();
-                }else if(voucher.getDiscountPercent()>0){
-                    total=total - total * voucher.getDiscountPercent() /100.0;
+        Map<String,Integer> decrementStock = new HashMap<>();
+        try {
+            for (CartItemDTO cartItemDTO : items) {
+                String key = "stock:" + cartItemDTO.getVariantId();
+                ProductVariant variant = variantMap.get(cartItemDTO.getVariantId());
+                if (variant == null) {
+                    throw new AppException("Sản phẩm không tồn tại: " + cartItemDTO.getVariantId());
                 }
-                order.setVoucher(voucher);
+                if (!redisTemplate.hasKey(key)) {
+                    redisTemplate.opsForValue().set(key, (long)(variant.getStockQuantity()), Duration.ofDays(7));
+                }
+
+
+                Long stockLeft = redisTemplate.opsForValue().decrement(key, cartItemDTO.getQuantity());
+                if (stockLeft == null || stockLeft < 0) {
+                    for (Map.Entry<String, Integer> entry : decrementStock.entrySet()) {
+                        redisTemplate.opsForValue().increment(entry.getKey(), entry.getValue());
+                    }
+                    redisTemplate.opsForValue().increment(key, cartItemDTO.getQuantity());
+                    throw new AppException("Sản phẩm " + cartItemDTO.getVariantId() + " không đủ hàng");
+                }
+                decrementStock.put(key, (int) cartItemDTO.getQuantity());
             }
+            double total = items.stream()
+                    .mapToDouble(item -> {
+                        ProductVariant variant = variantMap.get(item.getVariantId());
+                        return variant.getProduct().getPrice() * item.getQuantity();
+                    })
+                    .sum();
+
+            // Tạo đơn hàng
+            Order order = new Order();
+            if (orderRequest.getVoucherCode() != null && !orderRequest.getVoucherCode().isEmpty()) {
+                Voucher voucher = this.voucherService.applyVoucher(orderRequest.getVoucherCode(), total);
+                if (voucher != null) {
+                    voucher.setUsedCount(voucher.getUsedCount() + 1);
+                    this.voucherRepository.save(voucher);
+                    if (voucher.getDiscountAmount() > 0) {
+                        total -= voucher.getDiscountAmount();
+                    } else if (voucher.getDiscountPercent() > 0) {
+                        total = total - total * voucher.getDiscountPercent() / 100.0;
+                    }
+                    order.setVoucher(voucher);
+                }
+            }
+            if (total < 0) {
+                total = 0;
+            }
+            order.setTotal_price(total);
+            order.setUser(user);
+            order.setFullName(orderRequest.getFullName());
+            order.setPhoneNumber(orderRequest.getPhoneNumber());
+            order.setEmail(orderRequest.getEmail());
+            order.setAddress(orderRequest.getAddress());
+            order.setStatus(StatusOrder.PLACED);
+            order.setPaymentMethod(PaymentMethod.COD);
+            order = orderRepository.save(order); // lưu để lấy ID
+
+            // Tạo OrderDetail và trừ tồn kho
+            List<OrderDetail> orderDetails = new ArrayList<>();
+            for (CartItemDTO item : items) {
+                ProductVariant variant = variantMap.get(item.getVariantId());
+                Object stockObj = redisTemplate.opsForValue().get("stock:" + item.getVariantId());
+                if (stockObj != null) {
+                    variant.setStockQuantity(((Number) stockObj).intValue());
+                }
+
+                productVariantRepository.save(variant);
+
+
+                OrderDetail detail = new OrderDetail();
+                detail.setOrder(order);
+                detail.setProductVariant(variant);
+                detail.setQuantity(item.getQuantity());
+                detail.setPrice(variant.getProduct().getPrice());
+
+                orderDetails.add(detail);
+
+            }
+
+
+            orderDetailRepository.saveAll(orderDetails);
+
+            // Xóa giỏ hàng
+            cartService.clearCartByUserId(user.getId());
+
+            log.info("Tạo đơn hàng thành công: orderId={}, user={}", order.getId(), user.getEmail());
+            return convertOrderToOrderResponseDetail(order);
+        }catch(Exception e){
+            for(Map.Entry<String,Integer> entry : decrementStock.entrySet()) {
+                redisTemplate.opsForValue().increment(entry.getKey(), entry.getValue());
+            }
+            throw e;
         }
-        if(total<0){
-            total=0;
-        }
-        order.setTotal_price(total);
-        order.setUser(user);
-        order.setFullName(orderRequest.getFullName());
-        order.setPhoneNumber(orderRequest.getPhoneNumber());
-        order.setEmail(orderRequest.getEmail());
-        order.setAddress(orderRequest.getAddress());
-        order.setStatus(StatusOrder.PLACED);
-        order.setPaymentMethod(PaymentMethod.COD);
-        order = orderRepository.save(order); // lưu để lấy ID
-
-        // Tạo OrderDetail và trừ tồn kho
-        List<OrderDetail> orderDetails = new ArrayList<>();
-        for (CartItemDTO item : items) {
-            ProductVariant variant = findVariant(variants, item.getVariantId());
-
-            // Trừ tồn kho
-            variant.setStockQuantity(variant.getStockQuantity() - item.getQuantity());
-            productVariantRepository.save(variant);
-
-            OrderDetail detail = new OrderDetail();
-            detail.setOrder(order);
-            detail.setProductVariant(variant);
-            detail.setQuantity(item.getQuantity());
-            detail.setPrice(variant.getProduct().getPrice());
-
-            orderDetails.add(detail);
-
-        }
-
-
-        orderDetailRepository.saveAll(orderDetails);
-
-        // Xóa giỏ hàng
-        cartService.clearCartByUserId(user.getId());
-
-        log.info("Tạo đơn hàng thành công: orderId={}, user={}", order.getId(), user.getEmail());
-        return convertOrderToOrderResponseDetail(order);
     }
 
 
@@ -169,7 +213,7 @@ public class OrderService {
                 .orElseThrow(() -> new AppException("Không tìm thấy người dùng"));
 
         // 2. Lấy giỏ hàng
-        Cart cart = cartRepository.findByUser(user)
+        Cart cart = cartRepository.findByUserIdForUpdate(user.getId())
                 .orElseThrow(() -> new AppException("Không tìm thấy giỏ hàng"));
         List<CartItem> cartItems = new ArrayList<>(cart.getCartItems()); // <-- Quan trọng!
         if (cartItems.isEmpty()) {

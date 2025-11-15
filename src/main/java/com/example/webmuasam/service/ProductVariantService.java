@@ -7,6 +7,7 @@ import com.example.webmuasam.entity.ProductVariant;
 import com.example.webmuasam.exception.AppException;
 import com.example.webmuasam.repository.ProductRepository;
 import com.example.webmuasam.repository.ProductVariantRepository;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -17,9 +18,11 @@ import java.util.stream.Collectors;
 public class ProductVariantService {
     private final ProductVariantRepository productVariantRepository;
     private final ProductRepository productRepository;
-    public ProductVariantService(ProductVariantRepository productVariantRepository,ProductRepository productRepository) {
+    private final RedisTemplate<String, Object> redisTemplate;
+    public ProductVariantService(ProductVariantRepository productVariantRepository,ProductRepository productRepository,RedisTemplate<String, Object> redisTemplate) {
         this.productVariantRepository = productVariantRepository;
         this.productRepository = productRepository;
+        this.redisTemplate = redisTemplate;
     }
     @Transactional
     public ProductVariant createProductVariant(Long productId,ProductVariant productVariant) throws AppException {
@@ -30,7 +33,11 @@ public class ProductVariantService {
         }
         product.setQuantity(product.getQuantity()+productVariant.getStockQuantity());
         productRepository.save(product);
-        return this.productVariantRepository.save(productVariant);
+
+        ProductVariant pv=  this.productVariantRepository.save(productVariant);
+        String key= "stock:"+pv.getId();
+        redisTemplate.opsForValue().set(key,pv.getStockQuantity());
+        return pv;
     }
     public ProductVariantResponse getVariant(Long productId,String size,String color) throws AppException {
         ProductVariant productVariant = this.productVariantRepository.findByProduct_IdAndSizeAndColor(productId,size,color);
@@ -90,7 +97,9 @@ public class ProductVariantService {
         productVariant.setSize(updated.getSize());
         productVariant.setStockQuantity(updated.getStockQuantity());
 
-        productVariantRepository.save(productVariant);
+        ProductVariant pv =  productVariantRepository.save(productVariant);
+        String key = "stock:"+pv.getId();
+        redisTemplate.opsForValue().set(key,pv.getStockQuantity());
         ProductVariantResponse response = new ProductVariantResponse();
         response.setId(productVariant.getId());
         response.setSize(productVariant.getSize());
@@ -108,6 +117,8 @@ public class ProductVariantService {
             throw new AppException("ProductVariant not found with id: " + productVariantId);
         }
         productVariantRepository.deleteById(productVariantId);
+        String key = "stock:"+productVariantId;
+        redisTemplate.delete(key);
     }
 
 
