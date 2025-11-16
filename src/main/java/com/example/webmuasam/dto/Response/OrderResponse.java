@@ -1,8 +1,7 @@
 package com.example.webmuasam.dto.Response;
 
 import com.example.webmuasam.util.constant.StatusOrder;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
+
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 
@@ -19,5 +18,4 @@ public class OrderResponse {
     String phoneNumber;
     String email;
     String address;
-
 }

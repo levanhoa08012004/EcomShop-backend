@@ -1,19 +1,12 @@
 package com.example.webmuasam.dto.Response;
 
-import com.example.webmuasam.entity.Category;
-import com.example.webmuasam.entity.Images;
-import com.example.webmuasam.entity.ProductVariant;
-import com.example.webmuasam.util.SecurityUtil;
-import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import jakarta.persistence.*;
-import jakarta.validation.constraints.Min;
-import jakarta.validation.constraints.NotBlank;
-import lombok.*;
-import lombok.experimental.FieldDefaults;
-
 import java.time.Instant;
 import java.util.List;
+
+import jakarta.persistence.*;
+
+import lombok.*;
+import lombok.experimental.FieldDefaults;
 
 @Getter
 @Setter
@@ -41,24 +34,20 @@ public class ProductResponse {
     @AllArgsConstructor
     @NoArgsConstructor
     @FieldDefaults(level = AccessLevel.PRIVATE)
-    public static class Variants{
+    public static class Variants {
         Long id;
         String color;
         String size;
         int stockQuantity;
     }
+
     @Getter
     @Setter
     @AllArgsConstructor
     @NoArgsConstructor
     @FieldDefaults(level = AccessLevel.PRIVATE)
-    public static class CategoryPro{
+    public static class CategoryPro {
         Long id;
         String name;
     }
-
-
-
-
-
 }

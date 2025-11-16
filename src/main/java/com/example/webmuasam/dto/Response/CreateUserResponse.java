@@ -1,10 +1,11 @@
 package com.example.webmuasam.dto.Response;
 
+import java.time.Instant;
+
 import com.example.webmuasam.util.constant.GenderEnum;
+
 import lombok.*;
 import lombok.experimental.FieldDefaults;
-
-import java.time.Instant;
 
 @Getter
 @Setter
@@ -23,13 +24,12 @@ public class CreateUserResponse {
     String createdBy;
     RoleUser role;
 
-
     @Getter
     @Setter
     @FieldDefaults(level = AccessLevel.PRIVATE)
     @AllArgsConstructor
     @NoArgsConstructor
-    public static class RoleUser{
+    public static class RoleUser {
         long id;
         String name;
     }

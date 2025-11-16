@@ -1,11 +1,11 @@
 package com.example.webmuasam.exception;
 
 import com.example.webmuasam.util.constant.ResponseCode;
+
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-
 
 @Getter
 @Setter
@@ -19,6 +19,4 @@ public class BusinessException extends RuntimeException {
         super(message);
         this.responseCode = responseCode;
     }
-
-
 }

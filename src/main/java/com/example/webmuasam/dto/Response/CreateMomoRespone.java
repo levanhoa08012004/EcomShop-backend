@@ -1,6 +1,7 @@
 package com.example.webmuasam.dto.Response;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
 import lombok.*;
 
 @Builder
@@ -20,5 +21,4 @@ public class CreateMomoRespone {
     private String payUrl;
     private String deeplink;
     private String qrCodeUrl;
-
 }

@@ -1,36 +1,41 @@
 package com.example.webmuasam.service;
 
-import com.example.webmuasam.dto.Request.VoucherUpdateDTO;
-import com.example.webmuasam.dto.Response.ResultPaginationDTO;
-import com.example.webmuasam.dto.Response.VoucherResponse;
-import com.example.webmuasam.entity.Voucher;
-import com.example.webmuasam.exception.AppException;
-import com.example.webmuasam.repository.VoucherRepository;
+import java.time.LocalDate;
+import java.util.List;
+import java.util.stream.Collectors;
+
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.web.bind.annotation.PathVariable;
 
-import java.time.LocalDate;
-import java.util.List;
-import java.util.stream.Collectors;
+import com.example.webmuasam.dto.Request.VoucherUpdateDTO;
+import com.example.webmuasam.dto.Response.ResultPaginationDTO;
+import com.example.webmuasam.dto.Response.VoucherResponse;
+import com.example.webmuasam.entity.Voucher;
+import com.example.webmuasam.exception.AppException;
+import com.example.webmuasam.repository.VoucherRepository;
 
 @Service
 public class VoucherService {
     public final VoucherRepository voucherRepository;
+
     public VoucherService(VoucherRepository voucherRepository) {
         this.voucherRepository = voucherRepository;
     }
 
-    public Voucher applyVoucher(String code , Double totalPrice) throws AppException {
-        LocalDate date=LocalDate.now();
-        Voucher voucher = this.voucherRepository.findByCodeAndStatusTrueAndStartDateLessThanEqualAndEndDateGreaterThanEqual(code,date,date).orElseThrow(()->new AppException("Voucher không hợp lệ"));
-        if(totalPrice.compareTo(voucher.getMinOrder()) < 0){
+    public Voucher applyVoucher(String code, Double totalPrice) throws AppException {
+        LocalDate date = LocalDate.now();
+        Voucher voucher = this.voucherRepository
+                .findByCodeAndStatusTrueAndStartDateLessThanEqualAndEndDateGreaterThanEqual(code, date, date)
+                .orElseThrow(() -> new AppException("Voucher không hợp lệ"));
+        if (totalPrice.compareTo(voucher.getMinOrder()) < 0) {
             throw new AppException("Tổng tiền đơn hàng chưa đủ để sử dụng voucher này");
         }
         return voucher;
     }
+
     public VoucherResponse convertVoucherToVoucherResponse(Voucher voucher) throws AppException {
         VoucherResponse voucherResponse = new VoucherResponse();
         voucherResponse.setId(voucher.getId());
@@ -45,33 +50,37 @@ public class VoucherService {
         voucherResponse.setStatus(voucher.getStatus());
         return voucherResponse;
     }
-    public VoucherResponse createVoucher(Voucher voucher) throws AppException{
-        if(this.voucherRepository.existsByCode(voucher.getCode())) {
+
+    public VoucherResponse createVoucher(Voucher voucher) throws AppException {
+        if (this.voucherRepository.existsByCode(voucher.getCode())) {
             throw new AppException("Code voucher da ton tai");
         }
-        if(voucher.getStartDate().isAfter(voucher.getEndDate())){
+        if (voucher.getStartDate().isAfter(voucher.getEndDate())) {
             throw new AppException("ngày bắt đầu không đươc lớn hơn ngày kết thúc");
         }
-        if(voucher.getDiscountPercent()!=0 && voucher.getDiscountPercent()>100){
+        if (voucher.getDiscountPercent() != 0 && voucher.getDiscountPercent() > 100) {
             throw new AppException("Phần trăm giảm không được quá 100%");
         }
         this.voucherRepository.save(voucher);
         return this.convertVoucherToVoucherResponse(voucher);
     }
-    public VoucherResponse updateVoucher(VoucherUpdateDTO voucher) throws AppException{
+
+    public VoucherResponse updateVoucher(VoucherUpdateDTO voucher) throws AppException {
         voucherRepository.findByCode(voucher.getCode()).ifPresent(existing -> {
             if (!existing.getId().equals(voucher.getId())) {
                 throw new RuntimeException("Code voucher da ton tai");
             }
         });
-        if(voucher.getStartDate().isAfter(voucher.getEndDate())){
+        if (voucher.getStartDate().isAfter(voucher.getEndDate())) {
             throw new AppException("ngày bắt đầu không đươc lớn hơn ngày kết thúc");
         }
-        if(voucher.getDiscountPercent()>100){
+        if (voucher.getDiscountPercent() > 100) {
             throw new AppException("Phần trăm giảm không được quá 100%");
         }
-        Voucher updateVoucher = this.voucherRepository.findById(voucher.getId()).orElseThrow(()-> new AppException("Id voucher not found"));
-        if(updateVoucher !=null){
+        Voucher updateVoucher = this.voucherRepository
+                .findById(voucher.getId())
+                .orElseThrow(() -> new AppException("Id voucher not found"));
+        if (updateVoucher != null) {
             updateVoucher.setCode(voucher.getCode());
             updateVoucher.setDescription(voucher.getDescription());
             updateVoucher.setMinOrder(voucher.getMinOrder());
@@ -85,11 +94,11 @@ public class VoucherService {
         }
         return null;
     }
+
     public VoucherResponse getVoucherById(@PathVariable Long id) throws AppException {
-        return convertVoucherToVoucherResponse(this.voucherRepository.findById(id).orElseThrow(()-> new AppException("Id voucher not found")));
+        return convertVoucherToVoucherResponse(
+                this.voucherRepository.findById(id).orElseThrow(() -> new AppException("Id voucher not found")));
     }
-
-
 
     public ResultPaginationDTO getAllVoucher(Specification<Voucher> spec, Pageable pageable) {
         Page<Voucher> pageVouchers = this.voucherRepository.findAll(spec, pageable);
@@ -102,31 +111,33 @@ public class VoucherService {
         meta.setTotal(pageVouchers.getTotalElements());
         meta.setPages(pageVouchers.getTotalPages());
         resultPaginationDTO.setMeta(meta);
-        List<VoucherResponse> voucherResponses = pageVouchers.getContent().stream().map((v)->{
-            VoucherResponse voucherResponse = new VoucherResponse();
-            voucherResponse.setId(v.getId());
-            voucherResponse.setCode(v.getCode());
-            voucherResponse.setDescription(v.getDescription());
-            voucherResponse.setUsedCount(v.getUsedCount());
-            voucherResponse.setMinOrder(v.getMinOrder());
-            voucherResponse.setStartDate(v.getStartDate());
-            voucherResponse.setEndDate(v.getEndDate());
-            voucherResponse.setStatus(v.getStatus());
-            voucherResponse.setDiscountAmount(v.getDiscountAmount());
-            voucherResponse.setDiscountPercent(v.getDiscountPercent());
-            return voucherResponse;
-        }).collect(Collectors.toList());
+        List<VoucherResponse> voucherResponses = pageVouchers.getContent().stream()
+                .map((v) -> {
+                    VoucherResponse voucherResponse = new VoucherResponse();
+                    voucherResponse.setId(v.getId());
+                    voucherResponse.setCode(v.getCode());
+                    voucherResponse.setDescription(v.getDescription());
+                    voucherResponse.setUsedCount(v.getUsedCount());
+                    voucherResponse.setMinOrder(v.getMinOrder());
+                    voucherResponse.setStartDate(v.getStartDate());
+                    voucherResponse.setEndDate(v.getEndDate());
+                    voucherResponse.setStatus(v.getStatus());
+                    voucherResponse.setDiscountAmount(v.getDiscountAmount());
+                    voucherResponse.setDiscountPercent(v.getDiscountPercent());
+                    return voucherResponse;
+                })
+                .collect(Collectors.toList());
 
         resultPaginationDTO.setResult(voucherResponses);
         return resultPaginationDTO;
     }
 
     public void deleteVoucher(Long id) throws AppException {
-        Voucher voucher = this.voucherRepository.findById(id).orElseThrow(()-> new AppException("Id voucher not found"));
-        if(voucher.getUsedCount()>0) {
+        Voucher voucher =
+                this.voucherRepository.findById(id).orElseThrow(() -> new AppException("Id voucher not found"));
+        if (voucher.getUsedCount() > 0) {
             throw new AppException("Voucher đã được sử dụng");
         }
         this.voucherRepository.delete(voucher);
-
     }
 }

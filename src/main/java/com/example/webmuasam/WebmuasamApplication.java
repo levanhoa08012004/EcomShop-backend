@@ -14,8 +14,7 @@ import org.springframework.transaction.annotation.EnableTransactionManagement;
 @EnableCaching
 public class WebmuasamApplication {
 
-	public static void main(String[] args) {
-		SpringApplication.run(WebmuasamApplication.class, args);
-	}
-
+    public static void main(String[] args) {
+        SpringApplication.run(WebmuasamApplication.class, args);
+    }
 }

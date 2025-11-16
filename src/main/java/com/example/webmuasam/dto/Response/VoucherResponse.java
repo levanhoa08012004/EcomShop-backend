@@ -1,16 +1,15 @@
 package com.example.webmuasam.dto.Response;
 
-import jakarta.persistence.Column;
+import java.time.LocalDate;
+
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 
-import java.time.LocalDate;
 @Getter
 @Setter
 @AllArgsConstructor
 @NoArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
-
 public class VoucherResponse {
     Long id;
 

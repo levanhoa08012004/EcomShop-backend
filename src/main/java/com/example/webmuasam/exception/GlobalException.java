@@ -1,7 +1,8 @@
 package com.example.webmuasam.exception;
 
-import com.example.webmuasam.entity.ApiResponse;
-import lombok.Builder;
+import java.util.List;
+import java.util.stream.Collectors;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -12,22 +13,23 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
-import java.util.List;
-import java.util.stream.Collectors;
+import com.example.webmuasam.entity.ApiResponse;
+
+import lombok.Builder;
 
 @RestControllerAdvice
 @Builder
-public class GlobalException  {
+public class GlobalException {
 
-//    @ExceptionHandler(Exception.class)
-//    public ResponseEntity<ApiResponse<Object>> handleException(Exception e) {
-//        ApiResponse<Object> apiResponse = new ApiResponse<>();
-//        apiResponse.setStatusCode(HttpStatus.BAD_REQUEST.value());
-//        apiResponse.setMessage(e.getMessage());
-//        apiResponse.setError("apvalidtion");
-//        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(apiResponse);
-//
-//    }
+    //    @ExceptionHandler(Exception.class)
+    //    public ResponseEntity<ApiResponse<Object>> handleException(Exception e) {
+    //        ApiResponse<Object> apiResponse = new ApiResponse<>();
+    //        apiResponse.setStatusCode(HttpStatus.BAD_REQUEST.value());
+    //        apiResponse.setMessage(e.getMessage());
+    //        apiResponse.setError("apvalidtion");
+    //        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(apiResponse);
+    //
+    //    }
     @ExceptionHandler(value = PermissionException.class)
     public ResponseEntity<ApiResponse<Object>> handlePermissionException(Exception e) {
         ApiResponse<Object> apiResponse = new ApiResponse<>();
@@ -35,28 +37,31 @@ public class GlobalException  {
         apiResponse.setMessage(e.getMessage());
         apiResponse.setError("Bạn không có quyền truy cập");
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(apiResponse);
-
     }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<ApiResponse<Object>> handleMethodArgumentNotValidException(MethodArgumentNotValidException e) {
-        //lấy ra danh sách lỗi
+    public ResponseEntity<ApiResponse<Object>> handleMethodArgumentNotValidException(
+            MethodArgumentNotValidException e) {
+        // lấy ra danh sách lỗi
         BindingResult bindingResult = e.getBindingResult();
         final List<FieldError> fieldErrors = bindingResult.getFieldErrors();
 
-        ApiResponse<Object> api= new ApiResponse<Object>();
+        ApiResponse<Object> api = new ApiResponse<Object>();
         api.setStatusCode(HttpStatus.BAD_REQUEST.value());
         api.setError(e.getBody().getDetail());
 
-        List<String> errors = fieldErrors.stream().map(
-                f -> f.getDefaultMessage()).collect(Collectors.toUnmodifiableList());
+        List<String> errors =
+                fieldErrors.stream().map(f -> f.getDefaultMessage()).collect(Collectors.toUnmodifiableList());
 
-        api.setMessage(errors.size()>1 ?errors : errors.get(0));
+        api.setMessage(errors.size() > 1 ? errors : errors.get(0));
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(api);
     }
+
     @ExceptionHandler(BadCredentialsException.class)
     public ResponseEntity<?> handleBadCredentials(BadCredentialsException ex) {
         return ResponseEntity.status(401).body("Sai username hoặc password");
     }
+
     @ExceptionHandler(value = AppException.class)
     public ResponseEntity<ApiResponse<Object>> handleAppException(Exception e) {
         ApiResponse<Object> apiResponse = new ApiResponse<>();
@@ -64,19 +69,18 @@ public class GlobalException  {
         apiResponse.setMessage(e.getMessage());
         apiResponse.setError("lỗi người dùng");
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(apiResponse);
-
     }
-//    @ExceptionHandler(value = {
-//            StoregeException.class
-//    } )
-//    public ResponseEntity<ApiResponse<Object>> handleFileUploadException(Exception e) {
-//        ApiResponse<Object> apiResponse = ApiResponse.builder()
-//                .statusCode(HttpStatus.BAD_REQUEST.value())
-//                .message(e.getMessage())
-//                .error("Exception upload file")
-//                .build();
-//        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(apiResponse);
-//    }
+    //    @ExceptionHandler(value = {
+    //            StoregeException.class
+    //    } )
+    //    public ResponseEntity<ApiResponse<Object>> handleFileUploadException(Exception e) {
+    //        ApiResponse<Object> apiResponse = ApiResponse.builder()
+    //                .statusCode(HttpStatus.BAD_REQUEST.value())
+    //                .message(e.getMessage())
+    //                .error("Exception upload file")
+    //                .build();
+    //        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(apiResponse);
+    //    }
     @ExceptionHandler(value = NoResourceFoundException.class)
     public ResponseEntity<ApiResponse<Object>> handleNoResourceFoundException(NoResourceFoundException e) {
         ApiResponse<Object> api = new ApiResponse<Object>();
@@ -85,5 +89,4 @@ public class GlobalException  {
         api.setError("404 not Found...");
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(api);
     }
-
 }

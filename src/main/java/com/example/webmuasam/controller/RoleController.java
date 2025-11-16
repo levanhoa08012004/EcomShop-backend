@@ -1,17 +1,19 @@
 package com.example.webmuasam.controller;
 
+import jakarta.validation.Valid;
+
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
 import com.example.webmuasam.dto.Response.ResultPaginationDTO;
 import com.example.webmuasam.entity.Role;
 import com.example.webmuasam.exception.AppException;
 import com.example.webmuasam.service.RoleService;
 import com.example.webmuasam.util.annotation.ApiMessage;
 import com.turkraft.springfilter.boot.Filter;
-import jakarta.validation.Valid;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.jpa.domain.Specification;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/v1/roles")
@@ -49,7 +51,7 @@ public class RoleController {
 
     @GetMapping("/{id}")
     @ApiMessage("Fetch role by id")
-    public ResponseEntity<Role> getRoleById(@PathVariable Long id)  {
+    public ResponseEntity<Role> getRoleById(@PathVariable Long id) {
         return ResponseEntity.ok().body(this.roleService.fetchRoleById(id));
     }
 }

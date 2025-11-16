@@ -6,7 +6,6 @@ import lombok.Getter;
 @AllArgsConstructor
 @Getter
 public enum ResponseCode {
-
     SUCCESS("SUCCESS", 200),
     INTERNAL_SERVER_ERROR("INTERNAL_SERVER_ERROR", 500),
     BAD_REQUEST("BAD_REQUEST", 400),

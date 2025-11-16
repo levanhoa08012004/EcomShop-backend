@@ -1,24 +1,21 @@
 package com.example.webmuasam.dto.Response;
 
-import com.example.webmuasam.entity.Order;
-import com.example.webmuasam.entity.OrderDetail;
-import com.example.webmuasam.entity.ProductVariant;
-import com.example.webmuasam.entity.User;
+import java.time.Instant;
+import java.util.List;
+
+import jakarta.persistence.*;
+
 import com.example.webmuasam.util.constant.PaymentMethod;
 import com.example.webmuasam.util.constant.StatusOrder;
-import com.fasterxml.jackson.annotation.JsonIgnore;
-import jakarta.persistence.*;
+
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 
-import java.time.Instant;
-import java.util.List;
 @Getter
 @Setter
 @AllArgsConstructor
 @NoArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
-
 public class OrderResponseDetail {
     Long id;
     double total_price;
@@ -57,6 +54,7 @@ public class OrderResponseDetail {
         Long productId;
         ProductVariantOrder productVariant;
     }
+
     @Getter
     @Setter
     @AllArgsConstructor
@@ -69,9 +67,5 @@ public class OrderResponseDetail {
         int stockQuantity;
         String image;
         String name;
-
     }
-
-
-
 }

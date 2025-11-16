@@ -1,5 +1,18 @@
 package com.example.webmuasam.service;
 
+import java.time.*;
+import java.util.*;
+import java.util.stream.Collectors;
+
+import jakarta.annotation.PostConstruct;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import com.example.webmuasam.Specification.OrderSpecfication;
 import com.example.webmuasam.dto.Request.CartItemDTO;
 import com.example.webmuasam.dto.Request.OrderRequest;
@@ -14,19 +27,9 @@ import com.example.webmuasam.repository.*;
 import com.example.webmuasam.util.SecurityUtil;
 import com.example.webmuasam.util.constant.PaymentMethod;
 import com.example.webmuasam.util.constant.StatusOrder;
-import jakarta.annotation.PostConstruct;
+
 import lombok.Builder;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.jpa.domain.Specification;
-import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
-import java.time.*;
-import java.util.*;
-import java.util.stream.Collectors;
 
 @Service
 @Builder
@@ -43,8 +46,17 @@ public class OrderService {
     private final VoucherService voucherService;
     private final RedisTemplate<String, Object> redisTemplate;
 
-
-    public OrderService (OrderRepository orderRepository,ProductVariantRepository productVariantRepository,OrderDetailRepository orderDetailRepository,CartRepository cartRepository,CartItemRepository cartItemRepository,UserRepository userRepository,CartService cartService,VoucherRepository voucherRepository,VoucherService voucherService,RedisTemplate<String, Object> redisTemplate) {
+    public OrderService(
+            OrderRepository orderRepository,
+            ProductVariantRepository productVariantRepository,
+            OrderDetailRepository orderDetailRepository,
+            CartRepository cartRepository,
+            CartItemRepository cartItemRepository,
+            UserRepository userRepository,
+            CartService cartService,
+            VoucherRepository voucherRepository,
+            VoucherService voucherService,
+            RedisTemplate<String, Object> redisTemplate) {
         this.orderRepository = orderRepository;
         this.productVariantRepository = productVariantRepository;
         this.orderDetailRepository = orderDetailRepository;
@@ -85,27 +97,28 @@ public class OrderService {
         }
     }
 
-
     @Transactional
     public OrderResponseDetail createOrderByCash(OrderRequestByCash orderRequest) throws AppException {
-        String email = SecurityUtil.getCurrentUserLogin()
-                .orElseThrow(() -> new AppException("Token không hợp lệ"));
+        String email = SecurityUtil.getCurrentUserLogin().orElseThrow(() -> new AppException("Token không hợp lệ"));
 
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new AppException("Email không tồn tại"));
+        User user = userRepository.findByEmail(email).orElseThrow(() -> new AppException("Email không tồn tại"));
 
-        Cart cart = cartRepository.findByUserIdForUpdate(user.getId())
+        Cart cart = cartRepository
+                .findByUserIdForUpdate(user.getId())
                 .orElseThrow(() -> new AppException("Không tìm thấy giỏ hàng"));
 
-        List<CartItemDTO> items = cart.getCartItems().stream().map(ci -> new CartItemDTO(ci.getProductVariant().getId(),ci.getQuantity())).collect(Collectors.toList());
+        List<CartItemDTO> items = cart.getCartItems().stream()
+                .map(ci -> new CartItemDTO(ci.getProductVariant().getId(), ci.getQuantity()))
+                .collect(Collectors.toList());
         if (items.isEmpty()) {
             throw new AppException("Giỏ hàng đang trống");
         }
-        List<Long> variants = items.stream().map(CartItemDTO::getVariantId).distinct().toList();
-        Map<Long,ProductVariant> variantMap = this.productVariantRepository.findAllById(variants).stream().collect(Collectors.toMap(ProductVariant::getId,v->v));
+        List<Long> variants =
+                items.stream().map(CartItemDTO::getVariantId).distinct().toList();
+        Map<Long, ProductVariant> variantMap = this.productVariantRepository.findAllById(variants).stream()
+                .collect(Collectors.toMap(ProductVariant::getId, v -> v));
 
-
-        Map<String,Integer> decrementStock = new HashMap<>();
+        Map<String, Integer> decrementStock = new HashMap<>();
         try {
             for (CartItemDTO cartItemDTO : items) {
                 String key = "stock:" + cartItemDTO.getVariantId();
@@ -114,9 +127,8 @@ public class OrderService {
                     throw new AppException("Sản phẩm không tồn tại: " + cartItemDTO.getVariantId());
                 }
                 if (!redisTemplate.hasKey(key)) {
-                    redisTemplate.opsForValue().set(key, (long)(variant.getStockQuantity()), Duration.ofDays(7));
+                    redisTemplate.opsForValue().set(key, (long) (variant.getStockQuantity()), Duration.ofDays(7));
                 }
-
 
                 Long stockLeft = redisTemplate.opsForValue().decrement(key, cartItemDTO.getQuantity());
                 if (stockLeft == null || stockLeft < 0) {
@@ -137,7 +149,8 @@ public class OrderService {
 
             // Tạo đơn hàng
             Order order = new Order();
-            if (orderRequest.getVoucherCode() != null && !orderRequest.getVoucherCode().isEmpty()) {
+            if (orderRequest.getVoucherCode() != null
+                    && !orderRequest.getVoucherCode().isEmpty()) {
                 Voucher voucher = this.voucherService.applyVoucher(orderRequest.getVoucherCode(), total);
                 if (voucher != null) {
                     voucher.setUsedCount(voucher.getUsedCount() + 1);
@@ -174,7 +187,6 @@ public class OrderService {
 
                 productVariantRepository.save(variant);
 
-
                 OrderDetail detail = new OrderDetail();
                 detail.setOrder(order);
                 detail.setProductVariant(variant);
@@ -182,9 +194,7 @@ public class OrderService {
                 detail.setPrice(variant.getProduct().getPrice());
 
                 orderDetails.add(detail);
-
             }
-
 
             orderDetailRepository.saveAll(orderDetails);
 
@@ -193,27 +203,24 @@ public class OrderService {
 
             log.info("Tạo đơn hàng thành công: orderId={}, user={}", order.getId(), user.getEmail());
             return convertOrderToOrderResponseDetail(order);
-        }catch(Exception e){
-            for(Map.Entry<String,Integer> entry : decrementStock.entrySet()) {
+        } catch (Exception e) {
+            for (Map.Entry<String, Integer> entry : decrementStock.entrySet()) {
                 redisTemplate.opsForValue().increment(entry.getKey(), entry.getValue());
             }
             throw e;
         }
     }
 
-
-
-
     @Transactional
-    public OrderResponse checkoutWithVnPay(OrderRequest orderRequest)throws AppException {
+    public OrderResponse checkoutWithVnPay(OrderRequest orderRequest) throws AppException {
         // 1. Lấy user hiện tại từ token (qua email)
-        String email = SecurityUtil.getCurrentUserLogin()
-                .orElseThrow(() -> new AppException("Không thể xác thực người dùng"));
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new AppException("Không tìm thấy người dùng"));
+        String email =
+                SecurityUtil.getCurrentUserLogin().orElseThrow(() -> new AppException("Không thể xác thực người dùng"));
+        User user = userRepository.findByEmail(email).orElseThrow(() -> new AppException("Không tìm thấy người dùng"));
 
         // 2. Lấy giỏ hàng
-        Cart cart = cartRepository.findByUserIdForUpdate(user.getId())
+        Cart cart = cartRepository
+                .findByUserIdForUpdate(user.getId())
                 .orElseThrow(() -> new AppException("Không tìm thấy giỏ hàng"));
         List<CartItem> cartItems = new ArrayList<>(cart.getCartItems()); // <-- Quan trọng!
         if (cartItems.isEmpty()) {
@@ -221,14 +228,14 @@ public class OrderService {
         }
 
         // 3. Lock các biến thể sản phẩm
-        List<Long> variantIds = cartItems.stream()
-                .map(item -> item.getProductVariant().getId())
-                .toList();
+        List<Long> variantIds =
+                cartItems.stream().map(item -> item.getProductVariant().getId()).toList();
         List<ProductVariant> variants = productVariantRepository.findAllByIdInForUpdate(variantIds);
 
         // 4. Kiểm tra tồn kho
         for (CartItem item : cartItems) {
-            ProductVariant variant = findVariant(variants, item.getProductVariant().getId());
+            ProductVariant variant =
+                    findVariant(variants, item.getProductVariant().getId());
             if (variant.getStockQuantity() < item.getQuantity()) {
                 throw new AppException("Sản phẩm " + variant.getProduct().getName() + " không đủ số lượng");
             }
@@ -242,21 +249,22 @@ public class OrderService {
         // 6. Tạo đơn hàng (chưa trừ tồn kho vội)
         Order order = new Order();
 
-        if(orderRequest.getVoucherCode()!=null && !orderRequest.getVoucherCode().isEmpty()){
-            Voucher voucher = this.voucherService.applyVoucher(orderRequest.getVoucherCode(),total);
-            if(voucher!=null){
-                voucher.setUsedCount(voucher.getUsedCount()+1);
+        if (orderRequest.getVoucherCode() != null
+                && !orderRequest.getVoucherCode().isEmpty()) {
+            Voucher voucher = this.voucherService.applyVoucher(orderRequest.getVoucherCode(), total);
+            if (voucher != null) {
+                voucher.setUsedCount(voucher.getUsedCount() + 1);
                 this.voucherRepository.save(voucher);
-                if(voucher.getDiscountAmount()!=null){
-                    total-=voucher.getDiscountAmount();
-                }else if(voucher.getDiscountPercent()!=null){
-                    total=total - total/100*voucher.getDiscountPercent();
+                if (voucher.getDiscountAmount() != null) {
+                    total -= voucher.getDiscountAmount();
+                } else if (voucher.getDiscountPercent() != null) {
+                    total = total - total / 100 * voucher.getDiscountPercent();
                 }
                 order.setVoucher(voucher);
             }
         }
-        if(total<0){
-            total=0;
+        if (total < 0) {
+            total = 0;
         }
         order.setUser(user);
         order.setStatus(StatusOrder.PENDING); // chờ thanh toán
@@ -284,10 +292,9 @@ public class OrderService {
                     detail.setQuantity(item.getQuantity());
 
                     return detail;
-                }).toList();
+                })
+                .toList();
         orderDetailRepository.saveAll(orderDetails);
-
-
 
         // 9. Trả về OrderResponse (FE dùng redirect đến VNPay)
         return new OrderResponse(
@@ -297,53 +304,54 @@ public class OrderService {
                 order.getFullName(),
                 order.getPhoneNumber(),
                 order.getEmail(),
-                order.getAddress()
-        );
+                order.getAddress());
     }
 
-    private ProductVariant findVariant(List<ProductVariant> list, Long id) throws AppException{
+    private ProductVariant findVariant(List<ProductVariant> list, Long id) throws AppException {
         return list.stream()
                 .filter(pv -> pv.getId().equals(id))
                 .findFirst()
                 .orElseThrow(() -> new AppException("Không tìm thấy biến thể sản phẩm"));
     }
 
-//    @Scheduled(fixedRate = 60000) // mỗi 1 phút
-//    @Transactional
-//    public void cancelOrder() {
-//        Instant now = Instant.now();
-//
-//        List<Order> orders = orderRepository.findByStatusAndCreatedAtBefore(
-//                StatusOrder.PENDING.toString(),
-//                now.minusSeconds(900) // timeout 15 phút
-//        );
-//
-//        for (Order order : orders) {
-//            order.setStatus(StatusOrder.CANCELLED);
-//
-//            // Nếu có voucher thì hoàn lại
-//            if (order.getVoucher() != null) {
-//                Voucher voucher = order.getVoucher();
-//                if (voucher.getUsedCount() > 0) {
-//                    voucher.setUsedCount(voucher.getUsedCount() - 1);
-//                    voucherRepository.save(voucher);
-//                }
-//            }
-//        }
-//    }
-
+    //    @Scheduled(fixedRate = 60000) // mỗi 1 phút
+    //    @Transactional
+    //    public void cancelOrder() {
+    //        Instant now = Instant.now();
+    //
+    //        List<Order> orders = orderRepository.findByStatusAndCreatedAtBefore(
+    //                StatusOrder.PENDING.toString(),
+    //                now.minusSeconds(900) // timeout 15 phút
+    //        );
+    //
+    //        for (Order order : orders) {
+    //            order.setStatus(StatusOrder.CANCELLED);
+    //
+    //            // Nếu có voucher thì hoàn lại
+    //            if (order.getVoucher() != null) {
+    //                Voucher voucher = order.getVoucher();
+    //                if (voucher.getUsedCount() > 0) {
+    //                    voucher.setUsedCount(voucher.getUsedCount() - 1);
+    //                    voucherRepository.save(voucher);
+    //                }
+    //            }
+    //        }
+    //    }
 
     @Transactional
-    public void cancelOrder(Long userId, Long orderId) throws AppException{
-        Order order = orderRepository.findByIdAndUserId(orderId, userId)
+    public void cancelOrder(Long userId, Long orderId) throws AppException {
+        Order order = orderRepository
+                .findByIdAndUserId(orderId, userId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy đơn hàng"));
 
         if (order.getStatus() != StatusOrder.PENDING) {
             throw new RuntimeException("Chỉ có thể hủy đơn hàng đang chờ thanh toán");
         }
 
-        if(order.getVoucher() != null) {
-            Voucher voucher = this.voucherRepository.findById(order.getVoucher().getId()).orElseThrow(()-> new AppException("Không tìm thấy voucher"));
+        if (order.getVoucher() != null) {
+            Voucher voucher = this.voucherRepository
+                    .findById(order.getVoucher().getId())
+                    .orElseThrow(() -> new AppException("Không tìm thấy voucher"));
             voucher.setUsedCount(order.getVoucher().getUsedCount() - 1);
             voucherRepository.save(voucher);
         }
@@ -352,11 +360,9 @@ public class OrderService {
         orderRepository.delete(order);
     }
 
-
     @Transactional
-    public void confirmVnPayPayment(long txnRef, boolean success)throws AppException {
-        Order order = orderRepository.findById(txnRef)
-                .orElseThrow(() -> new AppException("Không tìm thấy đơn hàng"));
+    public void confirmVnPayPayment(long txnRef, boolean success) throws AppException {
+        Order order = orderRepository.findById(txnRef).orElseThrow(() -> new AppException("Không tìm thấy đơn hàng"));
 
         if (!order.getStatus().equals(StatusOrder.PENDING)) return;
 
@@ -369,8 +375,7 @@ public class OrderService {
                 productVariantRepository.save(variant);
             }
 
-
-            Long userId= order.getUser().getId();
+            Long userId = order.getUser().getId();
             this.cartService.clearCartByUserId(userId);
             order.setStatus(StatusOrder.PAID);
         } else {
@@ -390,20 +395,21 @@ public class OrderService {
 
         ResultPaginationDTO resultPaginationDTO = new ResultPaginationDTO();
         resultPaginationDTO.setMeta(meta);
-        List<OrderResponseDetail> listOrder = orders.getContent().stream().map(this::convertOrderToOrderResponseDetail).collect(Collectors.toList());
+        List<OrderResponseDetail> listOrder = orders.getContent().stream()
+                .map(this::convertOrderToOrderResponseDetail)
+                .collect(Collectors.toList());
         resultPaginationDTO.setResult(listOrder);
 
         return resultPaginationDTO;
     }
 
-
     public Order getOrderStatus(Long orderId) throws AppException {
         Order order;
-        order = this.orderRepository.findById(orderId).orElseThrow(()->new AppException("order khong ton tai"));
+        order = this.orderRepository.findById(orderId).orElseThrow(() -> new AppException("order khong ton tai"));
         return order;
     }
 
-    public ResultPaginationDTO getAllOrder(String status, Pageable pageable){
+    public ResultPaginationDTO getAllOrder(String status, Pageable pageable) {
         Specification<Order> spec = Specification.where(OrderSpecfication.hasStatus(status));
         Page<Order> orders = this.orderRepository.findAll(spec, pageable);
         ResultPaginationDTO resultPaginationDTO = new ResultPaginationDTO();
@@ -414,10 +420,13 @@ public class OrderService {
         meta.setTotal(orders.getTotalElements());
         meta.setPages(orders.getTotalPages());
         resultPaginationDTO.setMeta(meta);
-        List<OrderResponseDetail> listOrder = orders.getContent().stream().map(this::convertOrderToOrderResponseDetail).collect(Collectors.toList());
+        List<OrderResponseDetail> listOrder = orders.getContent().stream()
+                .map(this::convertOrderToOrderResponseDetail)
+                .collect(Collectors.toList());
         resultPaginationDTO.setResult(listOrder);
         return resultPaginationDTO;
     }
+
     public OrderResponseDetail convertOrderToOrderResponseDetail(Order order) {
         OrderResponseDetail orderResponseDetail = new OrderResponseDetail();
         orderResponseDetail.setId(order.getId());
@@ -442,19 +451,26 @@ public class OrderService {
                 OrderResponseDetail.OrderDetailUser userOrderDetail = new OrderResponseDetail.OrderDetailUser();
                 userOrderDetail.setId(orderDetail.getId());
                 userOrderDetail.setPrice(orderDetail.getPrice());
-                userOrderDetail.setProductId(orderDetail.getProductVariant().getProduct().getId());
+                userOrderDetail.setProductId(
+                        orderDetail.getProductVariant().getProduct().getId());
                 userOrderDetail.setQuantity(orderDetail.getQuantity());
                 OrderResponseDetail.ProductVariantOrder productVariant = new OrderResponseDetail.ProductVariantOrder();
                 productVariant.setId(orderDetail.getProductVariant().getId());
                 productVariant.setColor(orderDetail.getProductVariant().getColor());
                 productVariant.setSize(orderDetail.getProductVariant().getSize());
                 productVariant.setStockQuantity(orderDetail.getProductVariant().getStockQuantity());
-                productVariant.setName(orderDetail.getProductVariant().getProduct().getName());
+                productVariant.setName(
+                        orderDetail.getProductVariant().getProduct().getName());
                 if (orderDetail.getProductVariant().getProduct() != null
                         && orderDetail.getProductVariant().getProduct().getImages() != null
-                        && !orderDetail.getProductVariant().getProduct().getImages().isEmpty()) {
+                        && !orderDetail
+                                .getProductVariant()
+                                .getProduct()
+                                .getImages()
+                                .isEmpty()) {
 
-                    byte[] imageBytes = orderDetail.getProductVariant()
+                    byte[] imageBytes = orderDetail
+                            .getProductVariant()
                             .getProduct()
                             .getImages()
                             .getFirst()
@@ -474,29 +490,33 @@ public class OrderService {
     }
 
     public OrderResponseDetail getOrderDetail(Long orderId) throws AppException {
-        Order order = this.orderRepository.findById(orderId).orElseThrow(()->new AppException("order khong ton tai"));
+        Order order = this.orderRepository.findById(orderId).orElseThrow(() -> new AppException("order khong ton tai"));
         return convertOrderToOrderResponseDetail(order);
     }
 
-    public OrderResponseDetail changeStatusOrder(Long orderId,StatusOrder status) throws AppException {
-        Order order = this.orderRepository.findById(orderId).orElseThrow(()-> new AppException("order khong ton tai"));
-        if(status.equals(order.getStatus())) {
+    public OrderResponseDetail changeStatusOrder(Long orderId, StatusOrder status) throws AppException {
+        Order order = this.orderRepository.findById(orderId).orElseThrow(() -> new AppException("order khong ton tai"));
+        if (status.equals(order.getStatus())) {
             throw new AppException("Trùng status");
-        }else{
+        } else {
             order.setStatus(status);
             this.orderRepository.save(order);
         }
         return convertOrderToOrderResponseDetail(order);
     }
-    public OrderResponseDetail changeStatusOrderShipperAndUser(Long orderId,StatusOrder status) throws AppException {
-        Order order = this.orderRepository.findById(orderId).orElseThrow(()-> new AppException("order khong ton tai"));
-        if(status.equals(order.getStatus())) {
+
+    public OrderResponseDetail changeStatusOrderShipperAndUser(Long orderId, StatusOrder status) throws AppException {
+        Order order = this.orderRepository.findById(orderId).orElseThrow(() -> new AppException("order khong ton tai"));
+        if (status.equals(order.getStatus())) {
             throw new AppException("Trùng status");
-        }else{
-            if(status.equals(StatusOrder.COMPLETED) || status.equals(StatusOrder.SHIPPING) || status.equals(StatusOrder.DELIVERED) || status.equals(StatusOrder.FAILED_DELIVERY)) {
+        } else {
+            if (status.equals(StatusOrder.COMPLETED)
+                    || status.equals(StatusOrder.SHIPPING)
+                    || status.equals(StatusOrder.DELIVERED)
+                    || status.equals(StatusOrder.FAILED_DELIVERY)) {
                 order.setStatus(status);
                 this.orderRepository.save(order);
-            }else{
+            } else {
                 throw new AppException("Bạn không có quyền sửa trạng thái này");
             }
         }
@@ -509,19 +529,24 @@ public class OrderService {
         return orders.stream()
                 .collect(Collectors.groupingBy(
                         o -> o.getCreatedAt().atZone(ZoneId.systemDefault()).toLocalDate(),
-                        Collectors.collectingAndThen(
-                                Collectors.toList(),
-                                list -> {
-                                    LocalDate date = list.get(0).getCreatedAt().atZone(ZoneId.systemDefault()).toLocalDate();
-                                    long userCount = list.stream().map(o -> o.getUser().getId()).distinct().count();
-                                    long orderCount = list.size();
-                                    double revenue = list.stream().mapToDouble(Order::getTotal_price).sum();
-                                    return new DashboardResponse(date.toString(), userCount, orderCount, revenue);
-                                }
-                        )
-                ))
-                .values().stream()
-                .sorted((a,b) -> a.getLabel().compareTo(b.getLabel()))
+                        Collectors.collectingAndThen(Collectors.toList(), list -> {
+                            LocalDate date = list.get(0)
+                                    .getCreatedAt()
+                                    .atZone(ZoneId.systemDefault())
+                                    .toLocalDate();
+                            long userCount = list.stream()
+                                    .map(o -> o.getUser().getId())
+                                    .distinct()
+                                    .count();
+                            long orderCount = list.size();
+                            double revenue = list.stream()
+                                    .mapToDouble(Order::getTotal_price)
+                                    .sum();
+                            return new DashboardResponse(date.toString(), userCount, orderCount, revenue);
+                        })))
+                .values()
+                .stream()
+                .sorted((a, b) -> a.getLabel().compareTo(b.getLabel()))
                 .collect(Collectors.toList());
     }
 
@@ -541,22 +566,26 @@ public class OrderService {
         return orders.stream()
                 .collect(Collectors.groupingBy(
                         o -> o.getCreatedAt().atZone(ZoneId.systemDefault()).toLocalDate(),
-                        Collectors.collectingAndThen(
-                                Collectors.toList(),
-                                list -> {
-                                    LocalDate date = list.get(0).getCreatedAt().atZone(ZoneId.systemDefault()).toLocalDate();
-                                    long userCount = list.stream().map(o -> o.getUser().getId()).distinct().count();
-                                    long orderCount = list.size();
-                                    double revenue = list.stream().mapToDouble(Order::getTotal_price).sum();
-                                    return new DashboardResponse(date.toString(), userCount, orderCount, revenue);
-                                }
-                        )
-                ))
-                .values().stream()
+                        Collectors.collectingAndThen(Collectors.toList(), list -> {
+                            LocalDate date = list.get(0)
+                                    .getCreatedAt()
+                                    .atZone(ZoneId.systemDefault())
+                                    .toLocalDate();
+                            long userCount = list.stream()
+                                    .map(o -> o.getUser().getId())
+                                    .distinct()
+                                    .count();
+                            long orderCount = list.size();
+                            double revenue = list.stream()
+                                    .mapToDouble(Order::getTotal_price)
+                                    .sum();
+                            return new DashboardResponse(date.toString(), userCount, orderCount, revenue);
+                        })))
+                .values()
+                .stream()
                 .sorted(Comparator.comparing(DashboardResponse::getLabel)) // Sắp xếp theo ngày
                 .collect(Collectors.toList());
     }
-
 
     /** Lọc thống kê theo năm */
     public List<DashboardResponse> getStatsByYear(int year) {
@@ -564,19 +593,25 @@ public class OrderService {
 
         return orders.stream()
                 .collect(Collectors.groupingBy(
-                        o -> YearMonth.from(o.getCreatedAt().atZone(ZoneId.systemDefault()).toLocalDate()),
-                        Collectors.collectingAndThen(
-                                Collectors.toList(),
-                                list -> {
-                                    YearMonth ym = YearMonth.from(list.get(0).getCreatedAt().atZone(ZoneId.systemDefault()).toLocalDate());
-                                    long userCount = list.stream().map(o -> o.getUser().getId()).distinct().count();
-                                    long orderCount = list.size();
-                                    double revenue = list.stream().mapToDouble(Order::getTotal_price).sum();
-                                    return new DashboardResponse(ym.toString(), userCount, orderCount, revenue);
-                                }
-                        )
-                ))
-                .values().stream()
+                        o -> YearMonth.from(
+                                o.getCreatedAt().atZone(ZoneId.systemDefault()).toLocalDate()),
+                        Collectors.collectingAndThen(Collectors.toList(), list -> {
+                            YearMonth ym = YearMonth.from(list.get(0)
+                                    .getCreatedAt()
+                                    .atZone(ZoneId.systemDefault())
+                                    .toLocalDate());
+                            long userCount = list.stream()
+                                    .map(o -> o.getUser().getId())
+                                    .distinct()
+                                    .count();
+                            long orderCount = list.size();
+                            double revenue = list.stream()
+                                    .mapToDouble(Order::getTotal_price)
+                                    .sum();
+                            return new DashboardResponse(ym.toString(), userCount, orderCount, revenue);
+                        })))
+                .values()
+                .stream()
                 .sorted((a, b) -> a.getLabel().compareTo(b.getLabel()))
                 .collect(Collectors.toList());
     }

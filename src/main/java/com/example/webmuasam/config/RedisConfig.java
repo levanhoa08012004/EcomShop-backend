@@ -3,10 +3,8 @@ package com.example.webmuasam.config;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.connection.RedisStandaloneConfiguration;
-import org.springframework.data.redis.connection.lettuce.LettuceConnection;
 import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
 import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.data.redis.serializer.GenericToStringSerializer;
 import org.springframework.data.redis.serializer.Jackson2JsonRedisSerializer;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
 
@@ -17,9 +15,9 @@ public class RedisConfig {
         RedisStandaloneConfiguration configuration = new RedisStandaloneConfiguration();
         configuration.setHostName("16.19.0.128");
         configuration.setPort(6379);
-//        configuration.setDatabase(0);
-//        configuration.setUsername();
-//        configuration.setPassword();
+        //        configuration.setDatabase(0);
+        //        configuration.setUsername();
+        //        configuration.setPassword();
         return new LettuceConnectionFactory(configuration);
     }
 

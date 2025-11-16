@@ -1,6 +1,7 @@
 package com.example.webmuasam.dto.Request;
 
 import jakarta.validation.constraints.NotBlank;
+
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 
@@ -19,5 +20,4 @@ public class OrderRequest {
     String address;
     String voucherCode;
     String ipAddress;
-
 }

@@ -1,6 +1,7 @@
 package com.example.webmuasam.repository;
 
-import com.example.webmuasam.entity.Permission;
+import java.util.List;
+
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
@@ -8,12 +9,14 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.stereotype.Repository;
 
-import java.util.List;
+import com.example.webmuasam.entity.Permission;
 
 @Repository
 public interface PermissionRepository extends JpaRepository<Permission, Long>, JpaSpecificationExecutor<Permission> {
     Page<Permission> findAll(Specification<Permission> spec, Pageable pageable);
-    boolean existsByApiPathAndMethodAndModuleAndIdNot(String apiPath, String method, String module,Long Id);
+
+    boolean existsByApiPathAndMethodAndModuleAndIdNot(String apiPath, String method, String module, Long Id);
+
     boolean existsByApiPathAndMethodAndModule(String apiPath, String method, String module);
 
     List<Permission> findByIdIn(List<Long> id);

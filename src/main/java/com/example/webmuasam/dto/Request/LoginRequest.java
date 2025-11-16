@@ -1,6 +1,7 @@
 package com.example.webmuasam.dto.Request;
 
 import jakarta.validation.constraints.NotBlank;
+
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 
@@ -12,6 +13,7 @@ import lombok.experimental.FieldDefaults;
 public class LoginRequest {
     @NotBlank(message = "username khong duoc trong")
     String username;
+
     @NotBlank(message = "password khong duoc trong")
     String password;
 }

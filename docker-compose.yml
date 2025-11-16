@@ -1,0 +1,49 @@
+version: '3.8'
+
+services:
+  mysql:
+    image: mysql:8
+    container_name: mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: webmuasam
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+
+  redis:
+    image: redis:7
+    container_name: redis
+    restart: always
+    ports:
+      - "6379:6379"
+
+  spring:
+    build: .
+    container_name: springboot
+    restart: always
+    depends_on:
+      - mysql
+      - redis
+    ports:
+      - "8080:8080"
+    environment:
+      DBMS_USERNAME: root
+      DBMS_PASSWORD: root
+      JWT_SIGNERKEY: supersecretkey
+      MAIL_USERNAME: yourmail@gmail.com
+      MAIL_PASSWORD: yourpass
+      UPLOAD_DIR: file:///app/upload/
+      MOMO_ACCESSKEY: xxxxx
+      MOMO_SECRETKEY: yyyyy
+      MOMO_IPN_URL: http://SERVER_IP:8080/api/momo/ipn-handler
+      MOMO_RETURN_URL: http://FRONTEND_DOMAIN/
+    volumes:
+      - upload_data:/app/upload/
+
+volumes:
+  mysql_data:
+  redis_data:
+  upload_data:

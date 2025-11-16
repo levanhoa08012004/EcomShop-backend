@@ -1,17 +1,19 @@
 package com.example.webmuasam.entity;
 
-import com.example.webmuasam.util.SecurityUtil;
-import com.fasterxml.jackson.annotation.JsonIgnore;
+import java.time.Instant;
+import java.util.List;
+
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
+
+import com.example.webmuasam.util.SecurityUtil;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.experimental.FieldDefaults;
-
-import java.time.Instant;
-import java.util.List;
 
 @Entity
 @Getter
@@ -45,8 +47,7 @@ public class Permission {
     @JsonIgnore
     List<Role> roles;
 
-
-    public Permission(String name, String apiPath,String method,String module) {
+    public Permission(String name, String apiPath, String method, String module) {
         this.name = name;
         this.apiPath = apiPath;
         this.method = method;
@@ -54,14 +55,18 @@ public class Permission {
     }
 
     @PrePersist
-    public void handleBeforeCreate(){
+    public void handleBeforeCreate() {
         this.createdAt = Instant.now();
-        this.createdBy = SecurityUtil.getCurrentUserLogin().isPresent() ? SecurityUtil.getCurrentUserLogin().get() : null;
+        this.createdBy = SecurityUtil.getCurrentUserLogin().isPresent()
+                ? SecurityUtil.getCurrentUserLogin().get()
+                : null;
     }
 
     @PreUpdate
-    public void handleBeforeUpdate(){
+    public void handleBeforeUpdate() {
         this.updatedAt = Instant.now();
-        this.updatedBy = SecurityUtil.getCurrentUserLogin().isPresent() ? SecurityUtil.getCurrentUserLogin().get() : null;
+        this.updatedBy = SecurityUtil.getCurrentUserLogin().isPresent()
+                ? SecurityUtil.getCurrentUserLogin().get()
+                : null;
     }
 }

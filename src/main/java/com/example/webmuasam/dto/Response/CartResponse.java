@@ -1,15 +1,12 @@
 package com.example.webmuasam.dto.Response;
 
-import com.example.webmuasam.entity.Cart;
-import com.example.webmuasam.entity.CartItem;
-import com.example.webmuasam.entity.ProductVariant;
-import com.example.webmuasam.entity.User;
-import com.fasterxml.jackson.annotation.JsonIgnore;
+import java.util.List;
+
 import jakarta.persistence.*;
+
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 
-import java.util.List;
 @Getter
 @Setter
 @NoArgsConstructor

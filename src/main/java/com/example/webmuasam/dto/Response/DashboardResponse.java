@@ -8,9 +8,8 @@ import lombok.experimental.FieldDefaults;
 @FieldDefaults(level = AccessLevel.PRIVATE)
 @AllArgsConstructor
 public class DashboardResponse {
-    private String label;       // Ngày / Tháng / Năm
-    private Long userCount;     // Số người dùng
-    private Long orderCount;    // Số đơn hàng
+    private String label; // Ngày / Tháng / Năm
+    private Long userCount; // Số người dùng
+    private Long orderCount; // Số đơn hàng
     private Double revenue;
-
 }

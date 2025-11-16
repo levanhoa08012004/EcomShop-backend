@@ -1,7 +1,5 @@
 package com.example.webmuasam.dto.Response;
 
-
-import com.example.webmuasam.entity.ProductVariant;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 
@@ -16,8 +14,6 @@ public class ProductVariantResponse {
     String size;
     int stockQuantity;
     ProductResponse productResponse;
-
-
 
     @Getter
     @Setter

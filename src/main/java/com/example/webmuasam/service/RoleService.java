@@ -1,47 +1,47 @@
 package com.example.webmuasam.service;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+import java.util.stream.Collectors;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
+import org.springframework.stereotype.Service;
+
 import com.example.webmuasam.dto.Response.ResultPaginationDTO;
 import com.example.webmuasam.entity.Permission;
 import com.example.webmuasam.entity.Role;
 import com.example.webmuasam.exception.AppException;
 import com.example.webmuasam.repository.PermissionRepository;
 import com.example.webmuasam.repository.RoleRepository;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.jpa.domain.Specification;
-import org.springframework.stereotype.Service;
-
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Optional;
-import java.util.stream.Collectors;
 
 @Service
 public class RoleService {
     private final RoleRepository roleRepository;
     private final PermissionRepository permissionRepository;
+
     public RoleService(RoleRepository roleRepository, PermissionRepository permissionRepository) {
         this.roleRepository = roleRepository;
         this.permissionRepository = permissionRepository;
     }
 
-    public Role fetchRoleById(Long id){
+    public Role fetchRoleById(Long id) {
         Optional<Role> role = roleRepository.findById(id);
-        if(role.isPresent()){
+        if (role.isPresent()) {
             return role.get();
         }
         return null;
     }
 
     public Role createRole(Role role) throws AppException {
-        if(this.roleRepository.existsByName(role.getName())){
+        if (this.roleRepository.existsByName(role.getName())) {
             throw new AppException("Role đã tồn tại");
         }
-        if(role.getPermissions() != null && !role.getPermissions().isEmpty()){
-            List<Long> permissionIds = role.getPermissions()
-                    .stream()
-                    .map(Permission::getId)
-                    .collect(Collectors.toList());
+        if (role.getPermissions() != null && !role.getPermissions().isEmpty()) {
+            List<Long> permissionIds =
+                    role.getPermissions().stream().map(Permission::getId).collect(Collectors.toList());
             List<Permission> dbPermissions = this.permissionRepository.findByIdIn(permissionIds);
             role.setPermissions(dbPermissions);
         } else {
@@ -51,9 +51,11 @@ public class RoleService {
     }
 
     public Role updateRole(Role role) throws AppException {
-        Role currentRole = this.roleRepository.findById(role.getId()).orElseThrow(()->new AppException("role không tồn tại"));
-        if(!role.getPermissions().isEmpty()){
-            List<Long> permissionIds = role.getPermissions().stream().map(x -> x.getId()).collect(Collectors.toList());
+        Role currentRole =
+                this.roleRepository.findById(role.getId()).orElseThrow(() -> new AppException("role không tồn tại"));
+        if (!role.getPermissions().isEmpty()) {
+            List<Long> permissionIds =
+                    role.getPermissions().stream().map(x -> x.getId()).collect(Collectors.toList());
             List<Permission> dbPermissions = this.permissionRepository.findByIdIn(permissionIds);
             currentRole.setPermissions(dbPermissions);
         }
@@ -63,6 +65,7 @@ public class RoleService {
 
         return this.roleRepository.save(role);
     }
+
     public ResultPaginationDTO getAllRoles(Specification<Role> spec, Pageable pageable) {
         Page<Role> pageRole = this.roleRepository.findAll(spec, pageable);
         ResultPaginationDTO resultPaginationDTO = new ResultPaginationDTO();
@@ -78,12 +81,7 @@ public class RoleService {
     }
 
     public void deleteRole(Long id) throws AppException {
-        Role role = this.roleRepository.findById(id).orElseThrow(()-> new AppException("id role không tồn tại"));
+        Role role = this.roleRepository.findById(id).orElseThrow(() -> new AppException("id role không tồn tại"));
         this.roleRepository.delete(role);
-        }
     }
-
-
-
-
-
+}

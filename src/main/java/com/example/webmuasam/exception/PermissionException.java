@@ -1,6 +1,6 @@
 package com.example.webmuasam.exception;
 
-public class PermissionException extends Exception{
+public class PermissionException extends Exception {
     public PermissionException(String message) {
         super(message);
     }
